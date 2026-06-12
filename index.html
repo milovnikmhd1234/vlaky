@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dispečerský panel - HAViS / INISS s Firebase</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --accent-color: #00adb5;
+            --text-color: #eeeeee;
+            --delay-color: #ff2e63;
+        }
+        body { font-family: sans-serif; background-color: var(--bg-color); color: var(--text-color); padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-color); padding-bottom: 10px; }
+        .clock { font-size: 1.5rem; font-weight: bold; color: var(--accent-color); }
+        #login-section, #admin-section { background: var(--panel-bg); padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .hidden { display: none !important; }
+        input, select, button { padding: 10px; margin: 5px; border-radius: 4px; border: 1px solid #444; background: #333; color: #fff; }
+        button { background: var(--accent-color); color: black; font-weight: bold; cursor: pointer; border: none; }
+        button.logout-btn { background: var(--delay-color); color: white; }
+        .board-table { width: 100%; border-collapse: collapse; background: #050505; color: #ffcc00; font-family: monospace; }
+        .board-table th, .board-table td { border: 1px solid #222; padding: 12px; text-align: left; }
+        .board-table th { background: #111; color: #fff; }
+        .delay { color: var(--delay-color); font-weight: bold; }
+        .user-info { display: flex; align-items: center; gap: 10px; }
+        .user-info img { width: 32px; height: 32px; border-radius: 50%; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Informační systém HAViS / INISS</h1>
+        <div class="clock" id="realtime-clock">00:00:00</div>
+    </header>
+
+    <div id="login-section">
+        <h2>Přihlášení do systému (Dispečer)</h2>
+        <button onclick="loginWithGoogle()">Přihlásit se přes Google</button>
+    </div>
+
+    <div id="admin-section" class="hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="user-info" id="user-display"></div>
+            <button class="logout-btn" onclick="logoutFromGoogle()">Odhlásit se</button>
+        </div>
+        
+        <form id="train-form" onsubmit="saveTrain(event)">
+            <input type="hidden" id="edit-key" value="">
+            <select id="train-type" required>
+                <option value="Os">Os</option><option value="Sp">Sp</option><option value="R">R</option>
+                <option value="Ex">Ex</option><option value="IC">IC</option><option value="EC">EC</option>
+            </select>
+            <input type="text" id="train-line" placeholder="Linka" required>
+            <input type="text" id="train-direction" placeholder="Směr" required>
+            <input type="text" id="train-company" placeholder="Dopravce" required>
+            <input type="number" id="train-delay" placeholder="Zpoždění (min)" value="0">
+            <button type="submit" id="submit-btn">Uložit vlak</button>
+        </form>
+    </div>
+
+    <h2>Aktuální odjezdy vlaků</h2>
+    <table class="board-table">
+        <thead>
+            <tr>
+                <th>Druh</th><th>Linka</th><th>Směr</th><th>Dopravce</th><th>Zpoždění</th><th class="admin-action hidden">Akce</th>
+            </tr>
+        </thead>
+        <tbody id="board-body"></tbody>
+    </table>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // TVÁ KONFIGURACE (Doplň své reálné údaje, ale POZOR na veřejný GitHub)
+    const firebaseConfig = {
+        apiKey: "AIzaSyC_zk04B0n_czSY9su3elHCNakgKGHvHoo",
+        authDomain: "discord-937a7.firebaseapp.com",
+        databaseURL: "https://discord-937a7-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "discord-937a7",
+        storageBucket: "discord-937a7.firebasestorage.app",
+        messagingSenderId: "728552261275",
+        appId: "1:728552261275:web:17e4b8aa1687748710e83e"
+    };
+
+    // Inicializace
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+    const provider = new GoogleAuthProvider();
+
+    let currentUser = null;
+
+    // REÁLNÝ ČAS
+    setInterval(() => {
+        document.getElementById('realtime-clock').innerText = new Date().toLocaleTimeString('cs-CZ');
+    }, 1000);
+
+    // AUTHENTIKACE (Google Login)
+    window.loginWithGoogle = function() {
+        signInWithPopup(auth, provider).catch(error => console.error("Chyba přihlášení:", error));
+    }
+
+    window.logoutFromGoogle = function() {
+        signOut(auth).catch(error => console.error("Chyba odhlášení:", error));
+    }
+
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            currentUser = user;
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('admin-section').classList.remove('hidden');
+            document.getElementById('user-display').innerHTML = `<img src="${user.photoURL}"> <span>Dispečer: ${user.displayName}</span>`;
+            document.querySelectorAll('.admin-action').forEach(el => el.classList.remove('hidden'));
+        } else {
+            currentUser = null;
+            document.getElementById('login-section').classList.remove('hidden');
+            document.getElementById('admin-section').classList.add('hidden');
+            document.querySelectorAll('.admin-action').forEach(el => el.classList.add('hidden'));
+        }
+    });
+
+    // POBOČKA DATABÁZE - ČTENÍ DAT V REÁLNÉM ČASE
+    const trainsRef = ref(db, 'vlaky');
+    onValue(trainsRef, (snapshot) => {
+        const data = snapshot.val();
+        const tbody = document.getElementById('board-body');
+        tbody.innerHTML = '';
+        
+        if (data) {
+            Object.keys(data).forEach((key) => {
+                const train = data[key];
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${train.type}</strong></td>
+                    <td>${train.line}</td>
+                    <td>${train.direction}</td>
+                    <td>${train.company}</td>
+                    <td class="delay">${train.delay > 0 ? `+ ${train.delay} min` : 'Pravidelný příjezd'}</td>
+                    <td class="admin-action controls-cell ${currentUser ? '' : 'hidden'}">
+                        <button onclick="editTrain('${key}', '${train.type}', '${train.line}', '${train.direction}', '${train.company}', ${train.delay})">Upravit</button>
+                        <button onclick="deleteTrain('${key}')" style="background: red;">Smazat</button>
+                        <button onclick="announceTrain('${train.type}', '${train.line}', '${train.company}', '${train.direction}', ${train.delay})" style="background:#ffcc00; color:black;">Hlásit 🔊</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    });
+
+    // ZÁPIS / ÚPRAVA DO DATABÁZE
+    window.saveTrain = function(e) {
+        e.preventDefault();
+        const key = document.getElementById('edit-key').value;
+        const trainData = {
+            type: document.getElementById('train-type').value,
+            line: document.getElementById('train-line').value,
+            direction: document.getElementById('train-direction').value,
+            company: document.getElementById('train-company').value,
+            delay: parseInt(document.getElementById('train-delay').value) || 0
+        };
+
+        if (key === '') {
+            push(ref(db, 'vlaky'), trainData);
+        } else {
+            set(ref(db, `vlaky/${key}`), trainData);
+            document.getElementById('edit-key').value = '';
+            document.getElementById('submit-btn').innerText = "Uložit vlak";
+        }
+        document.getElementById('train-form').reset();
+    }
+
+    window.editTrain = function(key, type, line, direction, company, delay) {
+        document.getElementById('edit-key').value = key;
+        document.getElementById('train-type').value = type;
+        document.getElementById('train-line').value = line;
+        document.getElementById('train-direction').value = direction;
+        document.getElementById('train-company').value = company;
+        document.getElementById('train-delay').value = delay;
+        document.getElementById('submit-btn').innerText = "Uložit změny";
+    }
+
+    window.deleteTrain = function(key) {
+        if(confirm("Opravdu smazat tento vlak?")) {
+            remove(ref(db, `vlaky/${key}`));
+        }
+    }
+
+    // HLÁŠENÍ ROZHLASU
+    window.announceTrain = function(type, line, company, direction, delay) {
+        playGong();
+        let text = `Druhý nástupiště. Vlak ${type}, linky ${line}, společnosti ${company}, ve směru ${direction}, `;
+        text += delay > 0 ? `bude omluven o přibližně ${delay} minut.` : `je připraven k odjezdu.`;
+
+        setTimeout(() => {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'cs-CZ';
+            utterance.rate = 0.9;
+            window.speechSynthesis.speak(utterance);
+        }, 1200);
+    }
+
+    function playGong() {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function tone(freq, start, duration) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.1, start);
+            gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+            osc.start(start); osc.stop(start + duration);
+        }
+        tone(554.37, audioCtx.currentTime, 0.4);
+        tone(440.00, audioCtx.currentTime + 0.3, 0.6);
+    }
+</script>
+</body>
+</html>
