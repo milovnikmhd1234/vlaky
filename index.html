@@ -24,7 +24,6 @@
         button.logout-btn { background: var(--delay-color); color: white; }
         button.download-btn { background: #28a745; color: white; }
         
-        /* Styl samotné tabule pro export */
         #board-wrapper { background: #050505; padding: 15px; border-radius: 4px; }
         .board-table { width: 100%; border-collapse: collapse; color: #ffcc00; font-family: monospace; font-size: 1.2rem; }
         .board-table th, .board-table td { border: 1px solid #222; padding: 12px; text-align: left; }
@@ -89,18 +88,18 @@
                     <th class="admin-action hidden">Akce</th>
                 </tr>
             </thead>
-            <tbody id="board-body">
-                </tbody>
+            <tbody id="board-body"></tbody>
         </table>
     </div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // TVÁ NOVÁ KONFIGURACE
+    // TVÁ KONFIGURACE
     const firebaseConfig = {
         apiKey: "AIzaSyAmyaVbPqu1-wsrHL9KJ42MMc_g7ahMJbQ",
         authDomain: "discord-ee0a5.firebaseapp.com",
@@ -112,20 +111,21 @@
         measurementId: "G-K4HCS790X5"
     };
 
-    // Inicializace Firebase
+    // Inicializace
     const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
     const auth = getAuth(app);
     const db = getDatabase(app);
     const provider = new GoogleAuthProvider();
 
     let currentUser = null;
 
-    // REÁLNÝ ČAS
+    // Hodiny
     setInterval(() => {
         document.getElementById('realtime-clock').innerText = new Date().toLocaleTimeString('cs-CZ');
     }, 1000);
 
-    // GOOGLE PŘIHLÁŠENÍ / ODHLÁŠENÍ
+    // Google login funkce pro prohlížeč
     window.loginWithGoogle = function() {
         signInWithPopup(auth, provider).catch(error => alert("Chyba přihlášení: " + error.message));
     }
@@ -134,25 +134,23 @@
         signOut(auth).catch(error => console.error(error));
     }
 
-    // Sledování stavu přihlášení
     onAuthStateChanged(auth, (user) => {
         if (user) {
             currentUser = user;
             document.getElementById('login-section').classList.add('hidden');
             document.getElementById('admin-section').classList.remove('hidden');
             document.getElementById('user-display').innerHTML = `<img src="${user.photoURL}"> <span>Dispečer: ${user.displayName}</span>`;
-            renderBoard(); // Překreslí tabuli a zobrazí tlačítka pro editaci
+            renderBoard();
         } else {
             currentUser = null;
             document.getElementById('login-section').classList.remove('hidden');
             document.getElementById('admin-section').classList.add('hidden');
-            renderBoard(); // Skryje tlačítka pro úpravu
+            renderBoard();
         }
     });
 
-    // NAČÍTÁNÍ TABULE Z DATABÁZE V REÁLNÉM ČASE
     const trainsRef = ref(db, 'vlaky');
-    let localTrainsData = {}; // Pomocná proměnná pro uložení aktuálních dat
+    let localTrainsData = {};
 
     onValue(trainsRef, (snapshot) => {
         localTrainsData = snapshot.val() || {};
@@ -163,7 +161,6 @@
         const tbody = document.getElementById('board-body');
         tbody.innerHTML = '';
         
-        // Skrytí nebo zobrazení sloupce Akce v hlavičce
         const adminThs = document.querySelectorAll('.admin-action');
         adminThs.forEach(el => {
             if (currentUser) el.classList.remove('hidden');
@@ -192,10 +189,9 @@
         });
     }
 
-    // UKLÁDÁNÍ / EDITACE VLAKU
     window.saveTrain = function(e) {
         e.preventDefault();
-        if (!currentUser) return alert("K této akci musíte být přihlášen!");
+        if (!currentUser) return;
 
         const key = document.getElementById('edit-key').value;
         const trainData = {
@@ -207,9 +203,9 @@
         };
 
         if (key === '') {
-            push(ref(db, 'vlaky'), trainData); // Nový vlak
+            push(ref(db, 'vlaky'), trainData);
         } else {
-            set(ref(db, `vlaky/${key}`), trainData); // Úprava stávajícího
+            set(ref(db, `vlaky/${key}`), trainData);
             document.getElementById('edit-key').value = '';
             document.getElementById('submit-btn').innerText = "Uložit / Přidat vlak";
         }
@@ -231,16 +227,13 @@
 
     window.deleteTrain = function(key) {
         if (!currentUser) return;
-        if (confirm("Opravdu chcete tento vlak odstranit z tabule?")) {
+        if (confirm("Opravdu chcete tento vlak odstranit?")) {
             remove(ref(db, `vlaky/${key}`));
         }
     }
 
-    // FUNKCE PRO STAŽENÍ TABULE JAKO OBRÁZEK
     window.downloadBoard = function() {
         const element = document.getElementById('board-wrapper');
-        
-        // Vygeneruje obrázek z HTML elementu
         html2canvas(element, { backgroundColor: '#050505' }).then(canvas => {
             const link = document.createElement('a');
             link.download = 'stanicni-tabule.png';
@@ -249,7 +242,6 @@
         });
     }
 
-    // HLÁŠENÍ ROZHLASU
     window.announceTrain = function(type, line, company, direction, delay) {
         playGong();
         let text = `Druhý nástupiště. Vlak ${type}, linky ${line}, společnosti ${company}, ve směru ${direction}, `;
