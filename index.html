@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dispečerský panel - HAViS / INISS s Firebase</title>
+    <title>Dispečerský panel - HAViS / INISS</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -12,7 +12,7 @@
             --text-color: #eeeeee;
             --delay-color: #ff2e63;
         }
-        body { font-family: sans-serif; background-color: var(--bg-color); color: var(--text-color); padding: 20px; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg-color); color: var(--text-color); padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
         header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-color); padding-bottom: 10px; }
         .clock { font-size: 1.5rem; font-weight: bold; color: var(--accent-color); }
@@ -20,14 +20,20 @@
         .hidden { display: none !important; }
         input, select, button { padding: 10px; margin: 5px; border-radius: 4px; border: 1px solid #444; background: #333; color: #fff; }
         button { background: var(--accent-color); color: black; font-weight: bold; cursor: pointer; border: none; }
+        button:hover { opacity: 0.9; }
         button.logout-btn { background: var(--delay-color); color: white; }
-        .board-table { width: 100%; border-collapse: collapse; background: #050505; color: #ffcc00; font-family: monospace; }
+        button.download-btn { background: #28a745; color: white; }
+        
+        /* Styl samotné tabule pro export */
+        #board-wrapper { background: #050505; padding: 15px; border-radius: 4px; }
+        .board-table { width: 100%; border-collapse: collapse; color: #ffcc00; font-family: monospace; font-size: 1.2rem; }
         .board-table th, .board-table td { border: 1px solid #222; padding: 12px; text-align: left; }
-        .board-table th { background: #111; color: #fff; }
+        .board-table th { background: #111; color: #fff; font-family: sans-serif; }
         .delay { color: var(--delay-color); font-weight: bold; }
         .user-info { display: flex; align-items: center; gap: 10px; }
         .user-info img { width: 32px; height: 32px; border-radius: 50%; }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -45,32 +51,48 @@
     <div id="admin-section" class="hidden">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <div class="user-info" id="user-display"></div>
-            <button class="logout-btn" onclick="logoutFromGoogle()">Odhlásit se</button>
+            <div>
+                <button class="download-btn" onclick="downloadBoard()">Stáhnout jako PNG 💾</button>
+                <button class="logout-btn" onclick="logoutFromGoogle()">Odhlásit se</button>
+            </div>
         </div>
         
         <form id="train-form" onsubmit="saveTrain(event)">
             <input type="hidden" id="edit-key" value="">
             <select id="train-type" required>
-                <option value="Os">Os</option><option value="Sp">Sp</option><option value="R">R</option>
-                <option value="Ex">Ex</option><option value="IC">IC</option><option value="EC">EC</option>
+                <option value="Os">Os (Osobní)</option>
+                <option value="Sp">Sp (Spěšný)</option>
+                <option value="R">R (Rychlík)</option>
+                <option value="Ex">Ex (Express)</option>
+                <option value="IC">IC (InterCity)</option>
+                <option value="EC">EC (EuroCity)</option>
             </select>
-            <input type="text" id="train-line" placeholder="Linka" required>
-            <input type="text" id="train-direction" placeholder="Směr" required>
+            <input type="text" id="train-line" placeholder="Linka (S7, R16)" required>
+            <input type="text" id="train-direction" placeholder="Cílová stanice" required>
             <input type="text" id="train-company" placeholder="Dopravce" required>
-            <input type="number" id="train-delay" placeholder="Zpoždění (min)" value="0">
-            <button type="submit" id="submit-btn">Uložit vlak</button>
+            <input type="number" id="train-delay" placeholder="Zpoždění (min)" value="0" min="0">
+            <button type="submit" id="submit-btn">Uložit / Přidat vlak</button>
         </form>
     </div>
 
     <h2>Aktuální odjezdy vlaků</h2>
-    <table class="board-table">
-        <thead>
-            <tr>
-                <th>Druh</th><th>Linka</th><th>Směr</th><th>Dopravce</th><th>Zpoždění</th><th class="admin-action hidden">Akce</th>
-            </tr>
-        </thead>
-        <tbody id="board-body"></tbody>
-    </table>
+    
+    <div id="board-wrapper">
+        <table class="board-table">
+            <thead>
+                <tr>
+                    <th>Druh</th>
+                    <th>Linka</th>
+                    <th>Směr / Cílová stanice</th>
+                    <th>Dopravce</th>
+                    <th>Zpoždění</th>
+                    <th class="admin-action hidden">Akce</th>
+                </tr>
+            </thead>
+            <tbody id="board-body">
+                </tbody>
+        </table>
+    </div>
 </div>
 
 <script type="module">
@@ -78,18 +100,19 @@
     import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // TVÁ KONFIGURACE (Doplň své reálné údaje, ale POZOR na veřejný GitHub)
+    // TVÁ NOVÁ KONFIGURACE
     const firebaseConfig = {
-        apiKey: "AIzaSyC_zk04B0n_czSY9su3elHCNakgKGHvHoo",
-        authDomain: "discord-937a7.firebaseapp.com",
-        databaseURL: "https://discord-937a7-default-rtdb.europe-west1.firebasedatabase.app",
-        projectId: "discord-937a7",
-        storageBucket: "discord-937a7.firebasestorage.app",
-        messagingSenderId: "728552261275",
-        appId: "1:728552261275:web:17e4b8aa1687748710e83e"
+        apiKey: "AIzaSyAmyaVbPqu1-wsrHL9KJ42MMc_g7ahMJbQ",
+        authDomain: "discord-ee0a5.firebaseapp.com",
+        databaseURL: "https://discord-ee0a5-default-rtdb.firebaseio.com",
+        projectId: "discord-ee0a5",
+        storageBucket: "discord-ee0a5.firebasestorage.app",
+        messagingSenderId: "249676219689",
+        appId: "1:249676219689:web:bfd10059bf88de41c5e338",
+        measurementId: "G-K4HCS790X5"
     };
 
-    // Inicializace
+    // Inicializace Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getDatabase(app);
@@ -102,61 +125,78 @@
         document.getElementById('realtime-clock').innerText = new Date().toLocaleTimeString('cs-CZ');
     }, 1000);
 
-    // AUTHENTIKACE (Google Login)
+    // GOOGLE PŘIHLÁŠENÍ / ODHLÁŠENÍ
     window.loginWithGoogle = function() {
-        signInWithPopup(auth, provider).catch(error => console.error("Chyba přihlášení:", error));
+        signInWithPopup(auth, provider).catch(error => alert("Chyba přihlášení: " + error.message));
     }
 
     window.logoutFromGoogle = function() {
-        signOut(auth).catch(error => console.error("Chyba odhlášení:", error));
+        signOut(auth).catch(error => console.error(error));
     }
 
+    // Sledování stavu přihlášení
     onAuthStateChanged(auth, (user) => {
         if (user) {
             currentUser = user;
             document.getElementById('login-section').classList.add('hidden');
             document.getElementById('admin-section').classList.remove('hidden');
             document.getElementById('user-display').innerHTML = `<img src="${user.photoURL}"> <span>Dispečer: ${user.displayName}</span>`;
-            document.querySelectorAll('.admin-action').forEach(el => el.classList.remove('hidden'));
+            renderBoard(); // Překreslí tabuli a zobrazí tlačítka pro editaci
         } else {
             currentUser = null;
             document.getElementById('login-section').classList.remove('hidden');
             document.getElementById('admin-section').classList.add('hidden');
-            document.querySelectorAll('.admin-action').forEach(el => el.classList.add('hidden'));
+            renderBoard(); // Skryje tlačítka pro úpravu
         }
     });
 
-    // POBOČKA DATABÁZE - ČTENÍ DAT V REÁLNÉM ČASE
+    // NAČÍTÁNÍ TABULE Z DATABÁZE V REÁLNÉM ČASE
     const trainsRef = ref(db, 'vlaky');
+    let localTrainsData = {}; // Pomocná proměnná pro uložení aktuálních dat
+
     onValue(trainsRef, (snapshot) => {
-        const data = snapshot.val();
+        localTrainsData = snapshot.val() || {};
+        renderBoard();
+    });
+
+    function renderBoard() {
         const tbody = document.getElementById('board-body');
         tbody.innerHTML = '';
         
-        if (data) {
-            Object.keys(data).forEach((key) => {
-                const train = data[key];
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><strong>${train.type}</strong></td>
-                    <td>${train.line}</td>
-                    <td>${train.direction}</td>
-                    <td>${train.company}</td>
-                    <td class="delay">${train.delay > 0 ? `+ ${train.delay} min` : 'Pravidelný příjezd'}</td>
-                    <td class="admin-action controls-cell ${currentUser ? '' : 'hidden'}">
-                        <button onclick="editTrain('${key}', '${train.type}', '${train.line}', '${train.direction}', '${train.company}', ${train.delay})">Upravit</button>
-                        <button onclick="deleteTrain('${key}')" style="background: red;">Smazat</button>
+        // Skrytí nebo zobrazení sloupce Akce v hlavičce
+        const adminThs = document.querySelectorAll('.admin-action');
+        adminThs.forEach(el => {
+            if (currentUser) el.classList.remove('hidden');
+            else el.classList.add('hidden');
+        });
+
+        Object.keys(localTrainsData).forEach((key) => {
+            const train = localTrainsData[key];
+            const tr = document.createElement('tr');
+            
+            tr.innerHTML = `
+                <td><strong>${train.type}</strong></td>
+                <td>${train.line}</td>
+                <td>${train.direction}</td>
+                <td>${train.company}</td>
+                <td class="delay">${train.delay > 0 ? `+ ${train.delay} min` : 'Pravidelný'}</td>
+                ${currentUser ? `
+                    <td class="controls-cell">
+                        <button onclick="editTrain('${key}')">Upravit</button>
+                        <button onclick="deleteTrain('${key}')" style="background: #ff2e63;">Smazat</button>
                         <button onclick="announceTrain('${train.type}', '${train.line}', '${train.company}', '${train.direction}', ${train.delay})" style="background:#ffcc00; color:black;">Hlásit 🔊</button>
                     </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-    });
+                ` : ''}
+            `;
+            tbody.appendChild(tr);
+        });
+    }
 
-    // ZÁPIS / ÚPRAVA DO DATABÁZE
+    // UKLÁDÁNÍ / EDITACE VLAKU
     window.saveTrain = function(e) {
         e.preventDefault();
+        if (!currentUser) return alert("K této akci musíte být přihlášen!");
+
         const key = document.getElementById('edit-key').value;
         const trainData = {
             type: document.getElementById('train-type').value,
@@ -167,29 +207,46 @@
         };
 
         if (key === '') {
-            push(ref(db, 'vlaky'), trainData);
+            push(ref(db, 'vlaky'), trainData); // Nový vlak
         } else {
-            set(ref(db, `vlaky/${key}`), trainData);
+            set(ref(db, `vlaky/${key}`), trainData); // Úprava stávajícího
             document.getElementById('edit-key').value = '';
-            document.getElementById('submit-btn').innerText = "Uložit vlak";
+            document.getElementById('submit-btn').innerText = "Uložit / Přidat vlak";
         }
         document.getElementById('train-form').reset();
     }
 
-    window.editTrain = function(key, type, line, direction, company, delay) {
+    window.editTrain = function(key) {
+        const train = localTrainsData[key];
+        if (!train) return;
+
         document.getElementById('edit-key').value = key;
-        document.getElementById('train-type').value = type;
-        document.getElementById('train-line').value = line;
-        document.getElementById('train-direction').value = direction;
-        document.getElementById('train-company').value = company;
-        document.getElementById('train-delay').value = delay;
-        document.getElementById('submit-btn').innerText = "Uložit změny";
+        document.getElementById('train-type').value = train.type;
+        document.getElementById('train-line').value = train.line;
+        document.getElementById('train-direction').value = train.direction;
+        document.getElementById('train-company').value = train.company;
+        document.getElementById('train-delay').value = train.delay;
+        document.getElementById('submit-btn').innerText = "Uložit změny v lince";
     }
 
     window.deleteTrain = function(key) {
-        if(confirm("Opravdu smazat tento vlak?")) {
+        if (!currentUser) return;
+        if (confirm("Opravdu chcete tento vlak odstranit z tabule?")) {
             remove(ref(db, `vlaky/${key}`));
         }
+    }
+
+    // FUNKCE PRO STAŽENÍ TABULE JAKO OBRÁZEK
+    window.downloadBoard = function() {
+        const element = document.getElementById('board-wrapper');
+        
+        // Vygeneruje obrázek z HTML elementu
+        html2canvas(element, { backgroundColor: '#050505' }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = 'stanicni-tabule.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
     }
 
     // HLÁŠENÍ ROZHLASU
