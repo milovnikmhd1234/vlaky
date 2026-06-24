@@ -3,15 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Informační systém HAViS / INISS - Simulátor</title>
+    <title>Informační systém VISL - Simulátor</title>
     <style>
         :root {
             --bg-color: #0c0c0e;
             --panel-bg: #16161a;
             --accent-color: #00adb5;
             --text-color: #eeeeee;
-            --board-text: #ffbc00; /* Typická žlutá/oranžová pro vlakové panely */
-            --delay-color: #ff3366;
+            --board-green: #39b54a; /* Autentická zelená pro Os a Sp */
+            --board-red: #ff3333;   /* Autentická červená pro Rychlíky */
+            --board-white: #ffffff;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -24,10 +25,11 @@
 
         /* OVLÁDACÍ PANEL DISPEČERA */
         #admin-section { background: var(--panel-bg); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2d2d35; }
+        #admin-section.editing { border-color: #ffc107; box-shadow: 0 0 10px rgba(255, 193, 7, 0.2); }
         .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
         .admin-header h2 { font-size: 1.2rem; }
         
-        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
         input, select, button { padding: 12px 10px; border-radius: 6px; border: 1px solid #3a3a44; background: #22222b; color: #fff; font-size: 1rem; width: 100%; }
         input:focus, select:focus { border-color: var(--accent-color); outline: none; }
         
@@ -36,44 +38,56 @@
         button.download-btn { background: #28a745; color: white; width: auto; padding: 10px 15px; font-size: 0.9rem; }
         button.submit-btn-add { background: #00adb5; color: #000; }
 
-        /* STANIČNÍ PANEL (VZHLED) */
-        #board-wrapper { background: #000; padding: 15px; border-radius: 8px; border: 3px solid #222; box-shadow: 0 8px 24px rgba(0,0,0,0.8); }
-        .board-title { color: #fff; font-size: 1.1rem; margin-bottom: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+        /* REÁLNÝ VNĚJŠÍ PANEL (STYL VISL) */
+        #board-wrapper { background: #000; padding: 25px; border-radius: 4px; border: 4px solid #666; box-shadow: 0 12px 36px rgba(0,0,0,0.9); position: relative; }
+        .board-title { color: #ffffff; font-size: 2.2rem; text-align: center; margin-bottom: 20px; font-weight: bold; letter-spacing: 3px; font-family: 'Arial Black', sans-serif; }
         
-        .board-table { width: 100%; border-collapse: collapse; color: var(--board-text); font-family: 'Consolas', 'Courier New', monospace; font-size: 1.1rem; }
-        .board-table th { background: #111; color: #888; font-family: 'Segoe UI', sans-serif; font-size: 0.9rem; font-weight: normal; text-transform: uppercase; padding: 10px; text-align: left; border-bottom: 2px solid #222; }
-        .board-table td { padding: 14px 10px; border-bottom: 1px solid #111; vertical-align: middle; }
-        .board-table tr:hover td { background: #050505; }
+        .board-table { width: 100%; border-collapse: collapse; font-family: 'Consolas', 'Courier New', monospace; font-size: 1.25rem; letter-spacing: 0.5px; }
         
-        .train-type-bold { color: #fff; font-weight: bold; background: #222; padding: 2px 6px; border-radius: 4px; font-size: 0.95rem; }
-        .delay { color: var(--delay-color); font-weight: bold; }
+        /* Hlavička tabulky */
+        .board-table th { background: #000; color: #ffffff; font-family: 'Arial', sans-serif; font-size: 0.85rem; font-weight: bold; padding: 6px 4px; text-align: left; border-bottom: 1px solid #333; }
         
-        /* IKONOVÁ TLAČÍTKA */
-        .btn-icon { width: 38px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; margin: 2px; border-radius: 50%; }
+        /* Řádky imitující starou LED/Pragotron tabuli s linkami */
+        .board-table tr { 
+            background: linear-gradient(rgba(10,10,12,0.95) 50%, rgba(20,20,25,0.95) 50%); 
+            background-size: 100% 4px; /* Vytváří efekt řádkování obrazovky */
+        }
+        .board-table td { padding: 12px 6px; border-bottom: 1px solid #151515; vertical-align: middle; }
+        
+        /* Barevné kódování VISL */
+        .row-R { color: var(--board-red); }
+        .row-Ex { color: var(--board-red); }
+        .row-IC { color: var(--board-red); }
+        .row-EC { color: var(--board-red); }
+        .row-Os { color: var(--board-green); }
+        .row-Sp { color: var(--board-green); }
+        
+        .footer-brand { text-align: center; color: var(--board-green); font-family: 'Arial', sans-serif; font-size: 0.95rem; margin-top: 20px; letter-spacing: 1px; opacity: 0.8; }
+
+        /* FUNKČNÍ IKONY (TLACÍTKA) */
+        .btn-icon { width: 36px; height: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; margin: 2px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.2); }
         .btn-edit { background: #ffc107; color: #000; }
-        .btn-delete { background: var(--delay-color); color: #fff; }
+        .btn-delete { background: #ff3366; color: #fff; }
         .btn-audio { background: #ffcc00; color: #000; }
         .controls-cell { white-space: nowrap; text-align: right; }
+        
+        /* Skrytí elementů při focení do PNG */
+        .hide-for-export { display: none !important; }
 
-        /* RESPONSIVITA PRO MOBILY (Změna tabulky na karty) */
+        /* MOBILNÍ ZOBRAZENÍ (Karty) */
         @media (max-width: 768px) {
             h1 { font-size: 1.1rem; }
             .admin-header { flex-direction: column; align-items: flex-start; }
             button.download-btn { width: 100%; text-align: center; }
             
-            /* Skryjeme klasickou tabulku a přeskládáme ji */
             .board-table thead { display: none; }
             .board-table, .board-table tbody, .board-table tr, .board-table td { display: block; width: 100%; }
-            
-            .board-table tr { background: #050505; margin-bottom: 15px; border: 1px solid #1c1c22; border-radius: 6px; padding: 10px; }
-            .board-table td { border: none; padding: 6px 8px; text-align: left; }
-            
-            /* Označení dat na mobilu pomocí data-label atributů */
-            .board-table td::before { content: attr(data-label) ": "; color: #666; font-family: 'Segoe UI', sans-serif; font-size: 0.85rem; display: inline-block; width: 110px; }
-            
-            .board-table td.controls-cell { text-align: left; border-top: 1px solid #111; margin-top: 5px; padding-top: 10px; }
+            .board-table tr { margin-bottom: 15px; border: 1px solid #222; padding: 8px; border-radius: 4px; }
+            .board-table td { border: none; padding: 5px 8px; text-align: left; }
+            .board-table td::before { content: attr(data-label) ": "; color: #555; font-family: 'Arial', sans-serif; font-size: 0.8rem; display: inline-block; width: 120px; text-transform: uppercase; }
+            .board-table td.controls-cell { text-align: left; border-top: 1px solid #222; margin-top: 5px; padding-top: 10px; }
             .board-table td.controls-cell::before { display: none; }
-            .btn-icon { width: 45px; height: 45px; font-size: 1.2rem; margin-right: 8px; }
+            .btn-icon { width: 42px; height: 42px; font-size: 1.2rem; margin-right: 8px; }
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -81,15 +95,15 @@
 <body>
 
 <div class="container">
-    <header>
-        <h1>HAViS / INISS Panel</h1>
+    <header id="main-header">
+        <h1>Informační systém VISL Simulátor</h1>
         <div class="clock" id="realtime-clock">00:00:00</div>
     </header>
 
     <div id="admin-section">
         <div class="admin-header">
-            <h2>Dispečerský pultík</h2>
-            <button class="download-btn" onclick="downloadBoard()">Stáhnout jako PNG 💾</button>
+            <h2>Dispečerské pracoviště</h2>
+            <button class="download-btn" onclick="downloadBoard()">Stáhnout čisté PNG 💾</button>
         </div>
         
         <form id="train-form" onsubmit="saveTrain(event)">
@@ -104,82 +118,90 @@
                     <option value="IC">IC</option>
                     <option value="EC">EC</option>
                 </select>
-                <input type="number" id="train-number" placeholder="Číslo vlaku (e.g. 782)" required>
-                <input type="text" id="train-line" placeholder="Linka (S7)">
-                <input type="text" id="train-direction" placeholder="Směr" required>
-                <input type="text" id="train-company" placeholder="Dopravce" required>
-                <input type="number" id="train-delay" placeholder="Zpoždění (min)" value="0" min="0">
+                <input type="number" id="train-number" placeholder="Číslo (např. 1270)" required>
+                <input type="text" id="train-direction" placeholder="Cílová stanice" required>
+                <input type="text" id="train-via" placeholder="Směr jízdy / Přes">
+                <input type="text" id="train-nast" placeholder="Nást. (např. 2J)">
+                <input type="text" id="train-kolej" placeholder="Kolej (např. 3)">
+                <input type="number" id="train-delay" placeholder="Zpoždění" value="0" min="0">
                 <button type="submit" id="submit-btn" class="submit-btn-add">➕ Přidat</button>
             </div>
         </form>
     </div>
 
     <div id="board-wrapper">
-        <div class="board-title">Aktuální odjezdy vlaků / Departure board</div>
+        <div class="board-title">ODJEZDY</div>
         <table class="board-table">
             <thead>
                 <tr>
-                    <th>Čas</th>
-                    <th>Druh</th>
-                    <th>Číslo</th>
-                    <th>Linka</th>
-                    <th>Směr (Cílová stanice)</th>
-                    <th>Dopravce</th>
-                    <th>Zpoždění</th>
-                    <th style="text-align: right;">Akce</th>
+                    <th style="width: 10%;">DRUH ČÍSLO</th>
+                    <th style="width: 25%;">CÍLOVÁ STANICE</th>
+                    <th style="width: 25%;">SMĚR JÍZDY</th>
+                    <th style="width: 15%;">PRAV.ODJEZD</th>
+                    <th style="width: 7%;">NÁST.</th>
+                    <th style="width: 7%;">KOLEJ</th>
+                    <th style="width: 7%;">ZPOŽDĚNÍ</th>
+                    <th id="th-actions" style="text-align: right; width: 10%;">AKCE</th>
                 </tr>
             </thead>
             <tbody id="board-body"></tbody>
         </table>
+        <div class="footer-brand">Informační systém VISL 6.1</div>
     </div>
 </div>
 
 <script>
-    // Výchozí simulovaná data uložená v LocalStorage
-    let trains = JSON.parse(localStorage.getItem('havis_beta_trains')) || [
-        { id: "1", time: "14:35", type: 'Os', number: '9341', line: 'S7', direction: 'Praha hl.n.', company: 'České dráhy', delay: 0 },
-        { id: "2", time: "14:52", type: 'R', number: '762', line: 'R16', direction: 'Klatovy', company: 'České dráhy', delay: 10 }
+    // Výchozí sestava nadefinovaná přesně podle zaslané fotky!
+    let trains = JSON.parse(localStorage.getItem('visl_beta_trains')) || [
+        { id: "1", time: "11:24", type: 'R', number: '1270', direction: 'LIBEREC', via: 'Železný Brod', nast: '2J', kolej: '3', delay: 10 },
+        { id: "2", time: "11:37", type: 'Sp', number: '1845', direction: 'PARDUBICE HL.N.', via: 'Pardub.-Rosice n.L.', nast: '3', kolej: '4', delay: 0 },
+        { id: "3", time: "12:03", type: 'Os', number: '5611', direction: 'BOROHRÁDEK', via: 'Týniště n.Orlicí', nast: '', kolej: '', delay: 0 },
+        { id: "4", time: "12:04", type: 'R', number: '925', direction: 'TRUTNOV HL.N.', via: 'Jaroměř', nast: '', kolej: '', delay: 0 }
     ];
 
-    // Hodiny na panelu
     setInterval(() => {
         document.getElementById('realtime-clock').innerText = new Date().toLocaleTimeString('cs-CZ');
     }, 1000);
 
     function updateStorageAndRender() {
-        // Seřadit vlaky podle času odjezdu
         trains.sort((a, b) => a.time.localeCompare(b.time));
-        localStorage.setItem('havis_beta_trains', JSON.stringify(trains));
+        localStorage.setItem('visl_beta_trains', JSON.stringify(trains));
         renderBoard();
     }
 
-    // Vykreslení tabule s ohledem na mobilní data-label štítky
     function renderBoard() {
         const tbody = document.getElementById('board-body');
         tbody.innerHTML = '';
         
         trains.forEach((train) => {
             const tr = document.createElement('tr');
+            tr.className = `row-${train.type}`; // Přidá třídu pro barvu (červená/zelená)
             
+            // Sestavení formátu nástupiště a koleje podle VISL vzoru
+            let nastDisplay = train.nast || '';
+            let kolejDisplay = train.kolej || '';
+            let separator = (train.nast || train.kolej) ? ' / ' : '/';
+            if(!train.nast && !train.kolej) separator = '/';
+
             tr.innerHTML = `
-                <td data-label="Čas" style="color: #fff; font-weight: bold;">${train.time}</td>
-                <td data-label="Druh"><span class="train-type-bold">${train.type}</span></td>
-                <td data-label="Číslo">${train.number}</td>
-                <td data-label="Linka" style="color: #00adb5;">${train.line || '-'}</td>
-                <td data-label="Směr" style="text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;">${train.direction}</td>
-                <td data-label="Dopravce" style="color: #888; font-size: 0.95rem;">${train.company}</td>
-                <td data-label="Zpoždění" class="delay">${train.delay > 0 ? `+${train.delay} min` : 'Pravidelný'}</td>
-                <td class="controls-cell">
+                <td data-label="Druh Číslo"><span style="font-weight: bold;">${train.type}</span> ${train.number}</td>
+                <td data-label="Cílová stanice" style="text-transform: uppercase; font-weight: bold;">${train.direction}</td>
+                <td data-label="Směr jízdy">${train.via || ''}</td>
+                <td data-label="Prav. odjezd" style="font-weight: bold;">${train.time}</td>
+                <td data-label="Nástupiště" style="text-align: center; color:#fff;">${nastDisplay}</td>
+                <td data-label="Separátor" class="sep-cell" style="text-align: center; color: #555; display:none;">${separator}</td>
+                <td data-label="Kolej" style="text-align: center; color:#fff;">${kolejDisplay || '/'}</td>
+                <td data-label="Zpoždění" style="font-weight: bold; text-align: center;">${train.delay > 0 ? train.delay : ''}</td>
+                <td class="controls-cell action-column">
                     <button class="btn-icon btn-edit" onclick="editTrain('${train.id}')" title="Upravit">📝</button>
                     <button class="btn-icon btn-delete" onclick="deleteTrain('${train.id}')" title="Smazat">🗑️</button>
-                    <button class="btn-icon btn-audio" onclick="announceTrain('${train.type}', '${train.number}', '${train.direction}', ${train.delay})" title="Hlásit">🔊</button>
+                    <button class="btn-icon btn-audio" onclick="announceTrain('${train.type}', '${train.number}', '${train.direction}', '${train.via}', ${train.delay})" title="Hlásit">🔊</button>
                 </td>
             `;
             tbody.appendChild(tr);
         });
     }
 
-    // Uložení / Úprava
     function saveTrain(e) {
         e.preventDefault();
         const id = document.getElementById('edit-id').value;
@@ -188,9 +210,10 @@
             time: document.getElementById('train-time').value,
             type: document.getElementById('train-type').value,
             number: document.getElementById('train-number').value,
-            line: document.getElementById('train-line').value,
             direction: document.getElementById('train-direction').value,
-            company: document.getElementById('train-company').value,
+            via: document.getElementById('train-via').value,
+            nast: document.getElementById('train-nast').value,
+            kolej: document.getElementById('train-kolej').value,
             delay: parseInt(document.getElementById('train-delay').value) || 0
         };
 
@@ -204,16 +227,14 @@
                 trains[index] = trainData;
             }
             document.getElementById('edit-id').value = '';
-            const subBtn = document.getElementById('submit-btn');
-            subBtn.innerText = "➕ Přidat";
-            subBtn.className = "submit-btn-add";
+            document.getElementById('admin-section').classList.remove('editing');
+            document.getElementById('submit-btn').innerText = "➕ Přidat";
         }
 
         document.getElementById('train-form').reset();
         updateStorageAndRender();
     }
 
-    // Načtení do formuláře při stisku 📝
     function editTrain(id) {
         const train = trains.find(t => t.id === id);
         if (!train) return;
@@ -222,43 +243,60 @@
         document.getElementById('train-time').value = train.time;
         document.getElementById('train-type').value = train.type;
         document.getElementById('train-number').value = train.number;
-        document.getElementById('train-line').value = train.line;
         document.getElementById('train-direction').value = train.direction;
-        document.getElementById('train-company').value = train.company;
+        document.getElementById('train-via').value = train.via;
+        document.getElementById('train-nast').value = train.nast;
+        document.getElementById('train-kolej').value = train.kolej;
         document.getElementById('train-delay').value = train.delay;
         
-        const subBtn = document.getElementById('submit-btn');
-        subBtn.innerText = "💾 Uložit (#)";
-        subBtn.className = ""; // Reset barvy na základní modrou pro editaci
-        
-        // Automatický posun nahoru na mobilu, aby dispečer hned viděl formulář
+        document.getElementById('admin-section').classList.add('editing');
+        document.getElementById('submit-btn').innerText = "💾 Uložit";
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // Smazání vlaku při stisku 🗑️
     function deleteTrain(id) {
-        if (confirm("Opravdu smazat tento spoj z panelu?")) {
+        if (confirm("Opravdu smazat spoj ze systému?")) {
             trains = trains.filter(t => t.id !== id);
             updateStorageAndRender();
         }
     }
 
-    // Stažení tabule do PNG obrázku
+    // ČISTÉ STAŽENÍ PNG (Schová pultík i sloupce s ikonami)
     function downloadBoard() {
+        const adminSection = document.getElementById('admin-section');
+        const mainHeader = document.getElementById('main-header');
+        const thActions = document.getElementById('th-actions');
+        const actionCells = document.querySelectorAll('.action-column');
+
+        // 1. Schováme ovládací prvky z webu
+        adminSection.classList.add('hide-for-export');
+        mainHeader.classList.add('hide-for-export');
+        thActions.classList.add('hide-for-export');
+        actionCells.forEach(cell => cell.classList.add('hide-for-export'));
+
         const element = document.getElementById('board-wrapper');
+        
+        // 2. Vyfotíme čistou tabuli
         html2canvas(element, { backgroundColor: '#000000' }).then(canvas => {
             const link = document.createElement('a');
-            link.download = 'stanicni-panel.png';
+            link.download = 'stanicni-odjezdy-visl.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
+
+            // 3. Po vyfocení všechno vrátíme zase zpět do původního stavu
+            adminSection.classList.remove('hide-for-export');
+            mainHeader.classList.remove('hide-for-export');
+            thActions.classList.remove('hide-for-export');
+            actionCells.forEach(cell => cell.classList.remove('hide-for-export'));
         });
     }
 
-    // Staniční hlášení 🔊
-    function announceTrain(type, number, direction, delay) {
+    // Rozhlas
+    function announceTrain(type, number, direction, via, delay) {
         playGong();
-        let text = `Vlak ${type}, číslo ${number}, ve směru ${direction}, `;
-        text += delay > 0 ? `bude na svém příjezdu omluven o přibližně ${delay} minut.` : `je připraven k odjezdu.`;
+        let text = `Vlak ${type}, číslo ${number}, ve směru ${direction}`;
+        if (via) text += ` přes stanici ${via}`;
+        text += delay > 0 ? `, bude omluven o přibližně ${delay} minut.` : `, je připraven k odjezdu.`;
 
         setTimeout(() => {
             const utterance = new SpeechSynthesisUtterance(text);
@@ -283,7 +321,6 @@
         tone(440.00, audioCtx.currentTime + 0.3, 0.6);
     }
 
-    // První spuštění vykreslení
     renderBoard();
 </script>
 </body>
