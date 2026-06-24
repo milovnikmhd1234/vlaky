@@ -3,34 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dispečerský panel - HAViS / INISS (Starý Projekt)</title>
+    <title>Informační systém HAViS / INISS - Simulátor</title>
     <style>
         :root {
-            --bg-color: #121212;
-            --panel-bg: #1e1e1e;
+            --bg-color: #0c0c0e;
+            --panel-bg: #16161a;
             --accent-color: #00adb5;
             --text-color: #eeeeee;
-            --delay-color: #ff2e63;
+            --board-text: #ffbc00; /* Typická žlutá/oranžová pro vlakové panely */
+            --delay-color: #ff3366;
         }
-        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg-color); color: var(--text-color); padding: 20px; }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', -apple-system, sans-serif; background-color: var(--bg-color); color: var(--text-color); padding: 15px; }
         .container { max-width: 1200px; margin: 0 auto; }
-        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-color); padding-bottom: 10px; }
-        .clock { font-size: 1.5rem; font-weight: bold; color: var(--accent-color); }
-        #login-section, #admin-section { background: var(--panel-bg); padding: 20px; border-radius: 8px; margin: 20px 0; }
-        .hidden { display: none !important; }
-        input, select, button { padding: 10px; margin: 5px; border-radius: 4px; border: 1px solid #444; background: #333; color: #fff; }
-        button { background: var(--accent-color); color: black; font-weight: bold; cursor: pointer; border: none; }
-        button:hover { opacity: 0.9; }
-        button.logout-btn { background: var(--delay-color); color: white; }
-        button.download-btn { background: #28a745; color: white; }
+
+        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent-color); padding-bottom: 10px; margin-bottom: 15px; }
+        h1 { font-size: 1.4rem; color: #fff; }
+        .clock { font-size: 1.4rem; font-weight: bold; color: var(--accent-color); font-family: monospace; }
+
+        /* OVLÁDACÍ PANEL DISPEČERA */
+        #admin-section { background: var(--panel-bg); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2d2d35; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+        .admin-header h2 { font-size: 1.2rem; }
         
-        #board-wrapper { background: #050505; padding: 15px; border-radius: 4px; }
-        .board-table { width: 100%; border-collapse: collapse; color: #ffcc00; font-family: monospace; font-size: 1.2rem; }
-        .board-table th, .board-table td { border: 1px solid #222; padding: 12px; text-align: left; }
-        .board-table th { background: #111; color: #fff; font-family: sans-serif; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+        input, select, button { padding: 12px 10px; border-radius: 6px; border: 1px solid #3a3a44; background: #22222b; color: #fff; font-size: 1rem; width: 100%; }
+        input:focus, select:focus { border-color: var(--accent-color); outline: none; }
+        
+        button { background: var(--accent-color); color: #000; font-weight: bold; cursor: pointer; border: none; transition: background 0.2s; }
+        button:hover { opacity: 0.9; }
+        button.download-btn { background: #28a745; color: white; width: auto; padding: 10px 15px; font-size: 0.9rem; }
+        button.submit-btn-add { background: #00adb5; color: #000; }
+
+        /* STANIČNÍ PANEL (VZHLED) */
+        #board-wrapper { background: #000; padding: 15px; border-radius: 8px; border: 3px solid #222; box-shadow: 0 8px 24px rgba(0,0,0,0.8); }
+        .board-title { color: #fff; font-size: 1.1rem; margin-bottom: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+        
+        .board-table { width: 100%; border-collapse: collapse; color: var(--board-text); font-family: 'Consolas', 'Courier New', monospace; font-size: 1.1rem; }
+        .board-table th { background: #111; color: #888; font-family: 'Segoe UI', sans-serif; font-size: 0.9rem; font-weight: normal; text-transform: uppercase; padding: 10px; text-align: left; border-bottom: 2px solid #222; }
+        .board-table td { padding: 14px 10px; border-bottom: 1px solid #111; vertical-align: middle; }
+        .board-table tr:hover td { background: #050505; }
+        
+        .train-type-bold { color: #fff; font-weight: bold; background: #222; padding: 2px 6px; border-radius: 4px; font-size: 0.95rem; }
         .delay { color: var(--delay-color); font-weight: bold; }
-        .user-info { display: flex; align-items: center; gap: 10px; }
-        .user-info img { width: 32px; height: 32px; border-radius: 50%; }
+        
+        /* IKONOVÁ TLAČÍTKA */
+        .btn-icon { width: 38px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; margin: 2px; border-radius: 50%; }
+        .btn-edit { background: #ffc107; color: #000; }
+        .btn-delete { background: var(--delay-color); color: #fff; }
+        .btn-audio { background: #ffcc00; color: #000; }
+        .controls-cell { white-space: nowrap; text-align: right; }
+
+        /* RESPONSIVITA PRO MOBILY (Změna tabulky na karty) */
+        @media (max-width: 768px) {
+            h1 { font-size: 1.1rem; }
+            .admin-header { flex-direction: column; align-items: flex-start; }
+            button.download-btn { width: 100%; text-align: center; }
+            
+            /* Skryjeme klasickou tabulku a přeskládáme ji */
+            .board-table thead { display: none; }
+            .board-table, .board-table tbody, .board-table tr, .board-table td { display: block; width: 100%; }
+            
+            .board-table tr { background: #050505; margin-bottom: 15px; border: 1px solid #1c1c22; border-radius: 6px; padding: 10px; }
+            .board-table td { border: none; padding: 6px 8px; text-align: left; }
+            
+            /* Označení dat na mobilu pomocí data-label atributů */
+            .board-table td::before { content: attr(data-label) ": "; color: #666; font-family: 'Segoe UI', sans-serif; font-size: 0.85rem; display: inline-block; width: 110px; }
+            
+            .board-table td.controls-cell { text-align: left; border-top: 1px solid #111; margin-top: 5px; padding-top: 10px; }
+            .board-table td.controls-cell::before { display: none; }
+            .btn-icon { width: 45px; height: 45px; font-size: 1.2rem; margin-right: 8px; }
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -38,54 +82,51 @@
 
 <div class="container">
     <header>
-        <h1>Informační systém HAViS / INISS</h1>
+        <h1>HAViS / INISS Panel</h1>
         <div class="clock" id="realtime-clock">00:00:00</div>
     </header>
 
-    <div id="login-section">
-        <h2>Přihlášení do systému (Dispečer)</h2>
-        <button onclick="loginWithGoogle()">Přihlásit se přes Google</button>
-    </div>
-
-    <div id="admin-section" class="hidden">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div class="user-info" id="user-display"></div>
-            <div>
-                <button class="download-btn" onclick="downloadBoard()">Stáhnout jako PNG 💾</button>
-                <button class="logout-btn" onclick="logoutFromGoogle()">Odhlásit se</button>
-            </div>
+    <div id="admin-section">
+        <div class="admin-header">
+            <h2>Dispečerský pultík</h2>
+            <button class="download-btn" onclick="downloadBoard()">Stáhnout jako PNG 💾</button>
         </div>
         
         <form id="train-form" onsubmit="saveTrain(event)">
-            <input type="hidden" id="edit-key" value="">
-            <select id="train-type" required>
-                <option value="Os">Os (Osobní)</option>
-                <option value="Sp">Sp (Spěšný)</option>
-                <option value="R">R (Rychlík)</option>
-                <option value="Ex">Ex (Express)</option>
-                <option value="IC">IC (InterCity)</option>
-                <option value="EC">EC (EuroCity)</option>
-            </select>
-            <input type="text" id="train-line" placeholder="Linka (S7, R16)" required>
-            <input type="text" id="train-direction" placeholder="Cílová stanice" required>
-            <input type="text" id="train-company" placeholder="Dopravce" required>
-            <input type="number" id="train-delay" placeholder="Zpoždění (min)" value="0" min="0">
-            <button type="submit" id="submit-btn">Uložit / Přidat vlak</button>
+            <input type="hidden" id="edit-id" value="">
+            <div class="form-grid">
+                <input type="time" id="train-time" required>
+                <select id="train-type" required>
+                    <option value="Os">Os</option>
+                    <option value="Sp">Sp</option>
+                    <option value="R">R</option>
+                    <option value="Ex">Ex</option>
+                    <option value="IC">IC</option>
+                    <option value="EC">EC</option>
+                </select>
+                <input type="number" id="train-number" placeholder="Číslo vlaku (e.g. 782)" required>
+                <input type="text" id="train-line" placeholder="Linka (S7)">
+                <input type="text" id="train-direction" placeholder="Směr" required>
+                <input type="text" id="train-company" placeholder="Dopravce" required>
+                <input type="number" id="train-delay" placeholder="Zpoždění (min)" value="0" min="0">
+                <button type="submit" id="submit-btn" class="submit-btn-add">➕ Přidat</button>
+            </div>
         </form>
     </div>
 
-    <h2>Aktuální odjezdy vlaků</h2>
-    
     <div id="board-wrapper">
+        <div class="board-title">Aktuální odjezdy vlaků / Departure board</div>
         <table class="board-table">
             <thead>
                 <tr>
+                    <th>Čas</th>
                     <th>Druh</th>
+                    <th>Číslo</th>
                     <th>Linka</th>
-                    <th>Směr / Cílová stanice</th>
+                    <th>Směr (Cílová stanice)</th>
                     <th>Dopravce</th>
                     <th>Zpoždění</th>
-                    <th class="admin-action hidden">Akce</th>
+                    <th style="text-align: right;">Akce</th>
                 </tr>
             </thead>
             <tbody id="board-body"></tbody>
@@ -93,169 +134,136 @@
     </div>
 </div>
 
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+<script>
+    // Výchozí simulovaná data uložená v LocalStorage
+    let trains = JSON.parse(localStorage.getItem('havis_beta_trains')) || [
+        { id: "1", time: "14:35", type: 'Os', number: '9341', line: 'S7', direction: 'Praha hl.n.', company: 'České dráhy', delay: 0 },
+        { id: "2", time: "14:52", type: 'R', number: '762', line: 'R16', direction: 'Klatovy', company: 'České dráhy', delay: 10 }
+    ];
 
-    // TVÁ STARÁ KONFIGURACE (PROJEKT discord-937a7)
-    const firebaseConfig = {
-        apiKey: "AIzaSyC_zk04B0n_czSY9su3elHCNakgKGHvHoo",
-        authDomain: "discord-937a7.firebaseapp.com",
-        databaseURL: "https://discord-937a7-default-rtdb.europe-west1.firebasedatabase.app",
-        projectId: "discord-937a7",
-        storageBucket: "discord-937a7.firebasestorage.app",
-        messagingSenderId: "728552261275",
-        appId: "1:728552261275:web:bdc44ef9eed764d010e83e",
-        measurementId: "G-199BY313WS"
-    };
-
-    // Inicializace
-    const app = initializeApp(firebaseConfig);
-    const analytics = getAnalytics(app);
-    const auth = getAuth(app);
-    const db = getDatabase(app);
-    const provider = new GoogleAuthProvider();
-
-    let currentUser = null;
-
-    // Hodiny
+    // Hodiny na panelu
     setInterval(() => {
         document.getElementById('realtime-clock').innerText = new Date().toLocaleTimeString('cs-CZ');
     }, 1000);
 
-    // Google Login / Logout
-    window.loginWithGoogle = function() {
-        signInWithPopup(auth, provider).catch(error => alert("Chyba přihlášení: " + error.message));
-    }
-
-    window.logoutFromGoogle = function() {
-        signOut(auth).catch(error => console.error(error));
-    }
-
-    // Stav přihlášení
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            currentUser = user;
-            document.getElementById('login-section').classList.add('hidden');
-            document.getElementById('admin-section').classList.remove('hidden');
-            document.getElementById('user-display').innerHTML = `<img src="${user.photoURL}"> <span>Dispečer: ${user.displayName}</span>`;
-            renderBoard();
-        } else {
-            currentUser = null;
-            document.getElementById('login-section').classList.remove('hidden');
-            document.getElementById('admin-section').classList.add('hidden');
-            renderBoard();
-        }
-    });
-
-    // Realtime načítání dat z databáze
-    const trainsRef = ref(db, 'vlaky');
-    let localTrainsData = {};
-
-    onValue(trainsRef, (snapshot) => {
-        localTrainsData = snapshot.val() || {};
+    function updateStorageAndRender() {
+        // Seřadit vlaky podle času odjezdu
+        trains.sort((a, b) => a.time.localeCompare(b.time));
+        localStorage.setItem('havis_beta_trains', JSON.stringify(trains));
         renderBoard();
-    });
+    }
 
+    // Vykreslení tabule s ohledem na mobilní data-label štítky
     function renderBoard() {
         const tbody = document.getElementById('board-body');
         tbody.innerHTML = '';
         
-        const adminThs = document.querySelectorAll('.admin-action');
-        adminThs.forEach(el => {
-            if (currentUser) el.classList.remove('hidden');
-            else el.classList.add('hidden');
-        });
-
-        Object.keys(localTrainsData).forEach((key) => {
-            const train = localTrainsData[key];
+        trains.forEach((train) => {
             const tr = document.createElement('tr');
             
             tr.innerHTML = `
-                <td><strong>${train.type}</strong></td>
-                <td>${train.line}</td>
-                <td>${train.direction}</td>
-                <td>${train.company}</td>
-                <td class="delay">${train.delay > 0 ? `+ ${train.delay} min` : 'Pravidelný'}</td>
-                ${currentUser ? `
-                    <td class="controls-cell">
-                        <button onclick="editTrain('${key}')">Upravit</button>
-                        <button onclick="deleteTrain('${key}')" style="background: #ff2e63;">Smazat</button>
-                        <button onclick="announceTrain('${train.type}', '${train.line}', '${train.company}', '${train.direction}', ${train.delay})" style="background:#ffcc00; color:black;">Hlásit 🔊</button>
-                    </td>
-                ` : ''}
+                <td data-label="Čas" style="color: #fff; font-weight: bold;">${train.time}</td>
+                <td data-label="Druh"><span class="train-type-bold">${train.type}</span></td>
+                <td data-label="Číslo">${train.number}</td>
+                <td data-label="Linka" style="color: #00adb5;">${train.line || '-'}</td>
+                <td data-label="Směr" style="text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;">${train.direction}</td>
+                <td data-label="Dopravce" style="color: #888; font-size: 0.95rem;">${train.company}</td>
+                <td data-label="Zpoždění" class="delay">${train.delay > 0 ? `+${train.delay} min` : 'Pravidelný'}</td>
+                <td class="controls-cell">
+                    <button class="btn-icon btn-edit" onclick="editTrain('${train.id}')" title="Upravit">📝</button>
+                    <button class="btn-icon btn-delete" onclick="deleteTrain('${train.id}')" title="Smazat">🗑️</button>
+                    <button class="btn-icon btn-audio" onclick="announceTrain('${train.type}', '${train.number}', '${train.direction}', ${train.delay})" title="Hlásit">🔊</button>
+                </td>
             `;
             tbody.appendChild(tr);
         });
     }
 
-    // Správa dat (Zápis / Editace / Mazání)
-    window.saveTrain = function(e) {
+    // Uložení / Úprava
+    function saveTrain(e) {
         e.preventDefault();
-        if (!currentUser) return;
-
-        const key = document.getElementById('edit-key').value;
+        const id = document.getElementById('edit-id').value;
+        
         const trainData = {
+            time: document.getElementById('train-time').value,
             type: document.getElementById('train-type').value,
+            number: document.getElementById('train-number').value,
             line: document.getElementById('train-line').value,
             direction: document.getElementById('train-direction').value,
             company: document.getElementById('train-company').value,
             delay: parseInt(document.getElementById('train-delay').value) || 0
         };
 
-        if (key === '') {
-            push(ref(db, 'vlaky'), trainData);
+        if (id === '') {
+            trainData.id = Date.now().toString();
+            trains.push(trainData);
         } else {
-            set(ref(db, `vlaky/${key}`), trainData);
-            document.getElementById('edit-key').value = '';
-            document.getElementById('submit-btn').innerText = "Uložit / Přidat vlak";
+            const index = trains.findIndex(t => t.id === id);
+            if (index !== -1) {
+                trainData.id = id;
+                trains[index] = trainData;
+            }
+            document.getElementById('edit-id').value = '';
+            const subBtn = document.getElementById('submit-btn');
+            subBtn.innerText = "➕ Přidat";
+            subBtn.className = "submit-btn-add";
         }
+
         document.getElementById('train-form').reset();
+        updateStorageAndRender();
     }
 
-    window.editTrain = function(key) {
-        const train = localTrainsData[key];
+    // Načtení do formuláře při stisku 📝
+    function editTrain(id) {
+        const train = trains.find(t => t.id === id);
         if (!train) return;
 
-        document.getElementById('edit-key').value = key;
+        document.getElementById('edit-id').value = train.id;
+        document.getElementById('train-time').value = train.time;
         document.getElementById('train-type').value = train.type;
+        document.getElementById('train-number').value = train.number;
         document.getElementById('train-line').value = train.line;
         document.getElementById('train-direction').value = train.direction;
         document.getElementById('train-company').value = train.company;
         document.getElementById('train-delay').value = train.delay;
-        document.getElementById('submit-btn').innerText = "Uložit změny v lince";
+        
+        const subBtn = document.getElementById('submit-btn');
+        subBtn.innerText = "💾 Uložit (#)";
+        subBtn.className = ""; // Reset barvy na základní modrou pro editaci
+        
+        // Automatický posun nahoru na mobilu, aby dispečer hned viděl formulář
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    window.deleteTrain = function(key) {
-        if (!currentUser) return;
-        if (confirm("Opravdu chcete tento vlak smazat?")) {
-            remove(ref(db, `vlaky/${key}`));
+    // Smazání vlaku při stisku 🗑️
+    function deleteTrain(id) {
+        if (confirm("Opravdu smazat tento spoj z panelu?")) {
+            trains = trains.filter(t => t.id !== id);
+            updateStorageAndRender();
         }
     }
 
-    // Export tabule do .png
-    window.downloadBoard = function() {
+    // Stažení tabule do PNG obrázku
+    function downloadBoard() {
         const element = document.getElementById('board-wrapper');
-        html2canvas(element, { backgroundColor: '#050505' }).then(canvas => {
+        html2canvas(element, { backgroundColor: '#000000' }).then(canvas => {
             const link = document.createElement('a');
-            link.download = 'stanicni-tabule.png';
+            link.download = 'stanicni-panel.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
         });
     }
 
-    // Staniční rozhlas
-    window.announceTrain = function(type, line, company, direction, delay) {
+    // Staniční hlášení 🔊
+    function announceTrain(type, number, direction, delay) {
         playGong();
-        let text = `Druhý nástupiště. Vlak ${type}, linky ${line}, společnosti ${company}, ve směru ${direction}, `;
-        text += delay > 0 ? `bude omluven o přibližně ${delay} minut.` : `je připraven k odjezdu.`;
+        let text = `Vlak ${type}, číslo ${number}, ve směru ${direction}, `;
+        text += delay > 0 ? `bude na svém příjezdu omluven o přibližně ${delay} minut.` : `je připraven k odjezdu.`;
 
         setTimeout(() => {
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'cs-CZ';
-            utterance.rate = 0.9;
+            utterance.rate = 0.92;
             window.speechSynthesis.speak(utterance);
         }, 1200);
     }
@@ -267,13 +275,16 @@
             const gain = audioCtx.createGain();
             osc.connect(gain); gain.connect(audioCtx.destination);
             osc.frequency.value = freq;
-            gain.gain.setValueAtTime(0.1, start);
+            gain.gain.setValueAtTime(0.08, start);
             gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
             osc.start(start); osc.stop(start + duration);
         }
         tone(554.37, audioCtx.currentTime, 0.4);
         tone(440.00, audioCtx.currentTime + 0.3, 0.6);
     }
+
+    // První spuštění vykreslení
+    renderBoard();
 </script>
 </body>
 </html>
